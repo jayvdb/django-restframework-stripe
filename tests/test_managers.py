@@ -1,0 +1,47 @@
+from unittest import mock
+
+import pytest
+from stripe.error import InvalidRequestError
+
+from restframework_stripe import models
+from restframework_stripe.test import get_mock_resource
+
+
+@mock.patch("requests.post")
+@mock.patch("stripe.Account.retrieve")
+@pytest.mark.django_db
+def test_register_standalone_account(retrieve_account_mock, post_mock, user):
+    data = {
+        "token_type": "bearer",
+        "stripe_publishable_key": "pub_89jIOH23NUNhjs3",
+        "scope": "read_write",
+        "livemode": True,
+        "stripe_user_id": "acct_djio33fnioN",
+        "refresh_token": "tok_234jkods9J",
+        "access_token": "tok_fdjIOfj389hFho3"
+        }
+    post_mock.return_value = mock.Mock(json=mock.Mock(return_value=data))
+    retrieve_account_mock.return_value = get_mock_resource("Account",
+            id=data["stripe_user_id"])
+    connected = models.ConnectedAccount.objects.connect_standalone_account(user, "jjj")
+
+    assert connected.stripe_id == data["stripe_user_id"]
+    assert connected.publishable_key == data["stripe_publishable_key"]
+    assert connected.refresh_token == data["refresh_token"]
+    assert connected.access_token == data["access_token"]
+    assert connected in models.ConnectedAccount.objects.standalone_accounts()
+
+
+@mock.patch("requests.post")
+@pytest.mark.django_db
+def test_register_standalone_account_access_token_failure(post_mock, user):
+    data = {
+        "error": "invalid_grant",
+        "error_description": "Authorization code does not exist: jjj"
+        }
+    post_mock.return_value = mock.Mock(json=mock.Mock(return_value=data))
+
+    with pytest.raises(InvalidRequestError) as err:
+        models.ConnectedAccount.objects.connect_standalone_account(user, "jjj")
+        assert err.param == data["error"]
+        assert err._message == data["error_description"]
