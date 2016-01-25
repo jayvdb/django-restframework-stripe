@@ -1,6 +1,6 @@
 import stripe
 
-from .. import util
+from . import util
 
 
 CARD = {
@@ -152,11 +152,6 @@ TOKEN = {
     "used": False
 }
 
-TOKEN_CARD = TOKEN.copy().update({
-    "card": CARD,
-    "type": "card"
-    })
-
 ACCOUNT = {
     "id": "acct_1032D82eZvKYlo2C",
     "object": "account",
@@ -270,10 +265,106 @@ BANKACCOUNT = {
 }
 
 
-TOKEN_BANKACCOUNT = TOKEN.copy().update({
-    "BankAccount": CARD,
+PLAN = {
+    "id": "basic_plan_1",
+    "object": "plan",
+    "amount": 50,
+    "created": 1395968059,
+    "currency": "usd",
+    "interval": "month",
+    "interval_count": 1,
+    "livemode": False,
+    "metadata": {},
+    "name": "Basic Plan",
+    "statement_descriptor": None,
+    "trial_period_days": None
+}
+
+TRANSFER = {
+    "id": "tr_17V5Pc2eZvKYlo2C624QnTCJ",
+    "object": "transfer",
+    "amount": 100,
+    "amount_reversed": 0,
+    "application_fee": None,
+    "balance_transaction": "txn_17KGyT2eZvKYlo2CoIQ1KPB1",
+    "created": 1453232708,
+    "currency": "usd",
+    "date": 1453232708,
+    "description": None,
+    "destination": "card_17V5PZ2eZvKYlo2CA3xYUjXs",
+    "failure_code": None,
+    "failure_message": None,
+    "livemode": False,
+    "metadata": {},
+    "reversals": {
+        "object": "list",
+        "data": [],
+        "has_more": False,
+        "total_count": 0,
+        "url": "/v1/transfers/tr_17V5Pc2eZvKYlo2C624QnTCJ/reversals"
+    },
+    "reversed": False,
+    "source_transaction": None,
+    "source_type": "card",
+    "statement_descriptor": None,
+    "status": "paid",
     "type": "card"
-    })
+}
+
+
+SUBSCRIPTION = {
+    "id": "sub_7moaKHeA0jEXYc",
+    "object": "subscription",
+    "application_fee_percent": None,
+    "cancel_at_period_end": False,
+    "canceled_at": None,
+    "current_period_end": 1456424457,
+    "current_period_start": 1453746057,
+    "customer": "cus_7moNi7HgZhzDW3",
+    "discount": None,
+    "ended_at": None,
+    "metadata": {
+    },
+    "plan": {
+        "id": "basic_plan_1",
+        "object": "plan",
+        "amount": 50,
+        "created": 1395968059,
+        "currency": "usd",
+        "interval": "month",
+        "interval_count": 1,
+        "livemode": False,
+        "metadata": {
+        },
+        "name": "Basic Plan",
+        "statement_descriptor": None,
+        "trial_period_days": None
+    },
+    "quantity": 1,
+    "start": 1453746057,
+    "status": "active",
+    "tax_percent": None,
+    "trial_end": None,
+    "trial_start": None
+}
+
+
+COUPON = {
+    "id": "Tfrf9ICh",
+    "object": "coupon",
+    "amount_off": None,
+    "created": 1452719554,
+    "currency": "usd",
+    "duration": "once",
+    "duration_in_months": None,
+    "livemode": False,
+    "max_redemptions": None,
+    "metadata": {},
+    "percent_off": 75,
+    "redeem_by": None,
+    "times_redeemed": 0,
+    "valid": True
+}
 
 
 MOCKS = {
@@ -281,7 +372,11 @@ MOCKS = {
     "Customer": CUSTOMER,
     "Charge": CHARGE,
     "BankAccount": BANKACCOUNT,
-    "Account": ACCOUNT
+    "Account": ACCOUNT,
+    "Plan": PLAN,
+    "Transfer": TRANSFER,
+    "Subscription": SUBSCRIPTION,
+    "Coupon": COUPON
     }
 
 

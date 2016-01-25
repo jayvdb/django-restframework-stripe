@@ -1,1 +1,5 @@
-from restframework_stripe.urls import urlpatterns
+from django.conf.urls import url, include
+
+urlpatterns = [
+    url(r"^market/", include("restframework_stripe.urls", namespace="rf_stripe"))
+    ]

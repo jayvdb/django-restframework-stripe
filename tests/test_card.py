@@ -82,3 +82,19 @@ def test_card_create_error(card_create, customer_retrieve, customer, api_client)
     response = api_client.post(uri, data=data, format="json")
     assert response.status_code == 400
     assert response.data["token"] == "invalid token!"
+
+
+@mock.patch("stripe.Card.delete")
+@mock.patch("stripe.Card.retrieve")
+@pytest.mark.django_db
+def test_card_delete(card_retrieve, card_delete, user, api_client):
+    api_client.force_authenticate(user)
+    card_retrieve.return_value = get_mock_resource("Card")
+    card_delete.return_value = None  # no one cares about this value... EVER
+    card = mommy.make(models.Card, owner=user, source=get_mock_resource("Card"))
+
+    uri = reverse("rf_stripe:card-detail", kwargs={"pk": card.pk})
+    response = api_client.delete(uri)
+
+    assert response.status_code == 204
+    assert not models.Card.objects.filter(id=card.id).exists()

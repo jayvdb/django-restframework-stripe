@@ -1,8 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.contrib.postgres.fields import JSONField
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError as DJValidationError
 
 import stripe
 
@@ -217,19 +216,20 @@ class Charge(StripeModel):
     @classmethod
     def stripe_object_to_record(cls, stripe_object):
         record = super().stripe_object_to_record(stripe_object)
-        status = stripe_object["status"]
+        record["status"] = stripe_object["status"]
         return record
 
     def retrieve_payment_source(self):
         """
         """
         source = stripe.convert_to_stripe_object(self.source["source"], None, None)
-        if source.class_name() == "card":
+        class_name = source.class_name()
+        if class_name == "card":
             s = Card.objects.get(stripe_id=source["id"])
-        elif source.class_name() == "bankaccount":
+        elif class_name == "bankaccount":
             s = BankAccount.objects.get(stripe_id=source["id"])
         else:
-            return source
+            raise NotImplementedError(class_name)
         return s
 
     @property
@@ -351,7 +351,32 @@ class BankAccount(StripeModel):
 
 
 class Transfer(StripeModel):
-    """
+    """ A Transfer resource is used to move money from your platform to a
+    ConnectedAccount. This is one of two ways to pay the merchants connected to your
+    platform, the other being the `destination` parameter of a Charge resource.
+
+    To create a transfer you will need a document like this::
+
+        {
+            "amount": 1000,
+            "currency": "usd",
+            "destination": "bank_Djfif3892hChjkLf"
+        }
+
+    Where `distination` is an id of a ConnectedAccount, BankAccount or Card to transfer
+    funds to.
+
+    It is also best to include a `description` and `statement_descriptor` so the receiver
+    of the Transfer knows exactly what it is. In most cases, complying with Stripe, a
+    Transfer is not meant to be explicitly created by your platform. So most transfers
+    **MUST** be directly link to an incoming charge through the `source_transaction`
+    parameter. For more information on special case transfers see `Custom Transfers`_.
+
+    .. _Custom Transfers:: https://stripe.com/docs/connect/special-case-transfers
+
+    For more information on the Transfer resource see `Stripe Transfer`_.
+
+    .. _Stripe Transfer:: https://stripe.com/docs/api/python#transfer_object
     """
     STRIPE_API_NAME = "Transfer"
 
@@ -367,6 +392,33 @@ class Transfer(StripeModel):
     @property
     def succeeded(self):
         return self.status not in ("canceled", "failed")
+
+
+class Subscription(StripeModel):
+    """ A subscription is a resource used to create reoccuring charges to customers based
+    on a Plan.
+
+    For more information on the Subscription resource see `Stripe Subscription`_.
+
+    .. _Stripe Subscription:: https://stripe.com/docs/api/python#subscription_object
+    """
+    STRIPE_API_NAME = "Subscription"
+
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL,
+                                related_name="stripe_subscriptions")
+
+    plan = models.ForeignKey("Plan", related_name="subscriptions")
+    coupon = models.ForeignKey("Coupon", null=True, related_name="subscriptions")
+    canceled = models.BooleanField(default=False)
+
+    @classmethod
+    def stripe_object_to_record(cls, stripe_object):
+        record = super().stripe_object_to_record(stripe_object)
+        record["plan"] = Plan.objects.get(stripe_id=stripe_object["plan"]["id"])
+        if stripe_object.get("discount", None) is not None:
+            coupon = stripe_object["discount"]["coupon"]["id"]
+            record["coupon"] = Coupon.objects.get(stripe_id=coupon)
+        return record
 
 
 class Event(StripeModel):
@@ -442,3 +494,121 @@ class EventProcessingError(models.Model):
     event = models.ForeignKey(Event, related_name="processing_errors")
     message = models.TextField()
     datetime_created = models.DateTimeField(auto_now_add=True)
+
+
+class Plan(StripeModel):
+    """ The Plan resource, unlike many of the client editable resources, is read-only to
+    end users. A Plan should be created by admin users (likely using the Django admin
+    interface). Also, unlike client editable resources, this model is created in a
+    local database before creating the resource with Stripe.
+
+    Plans are used to setup reoccuring charges through Subscriptions
+
+    ``name`` the unique identifier for this Plan, such as 'gold'.
+    ``amount`` the total amount to charge per interval in cents.
+    ``currency`` the 3 character ISO code for the country.
+    ``name_on_invoice`` the name of the plan to be displayed on invoices in the Stripe
+    web interface.
+    ``interval`` the interval at which to charge a subscriber (per day, month, week or
+    year).
+    ``statement_descriptor`` a 22 character max description that will be displayed on a
+    subscribers credit card statement.
+    ``interval_count`` the number of intervals between each subscription billing.
+    ``trial_period_days`` the number of days in which this plan is free.
+
+    .. note::
+
+        Plan.objects.create_resource_from_model() should be called **BEFORE** saving the
+        model instance. If `.save()` is called before then an integrity error will be
+        raised because the `stripe_id` field is blank.
+    """
+    STRIPE_API_NAME = "Plan"
+
+    DAILY = 0
+    WEEKLY = 1
+    MONTHLY = 2
+    YEARLY = 3
+    INTERVAL_CHOICES = (
+        (DAILY, "day"),
+        (WEEKLY, "week"),
+        (MONTHLY, "month"),
+        (YEARLY, "year")
+        )
+
+    name = models.CharField(max_length=120, unique=True)
+    amount = models.PositiveIntegerField()
+    interval = models.PositiveSmallIntegerField(choices=INTERVAL_CHOICES)
+    name_on_invoice = models.CharField(max_length=50)
+    statement_descriptor = models.CharField(max_length=22)
+    interval_count = models.PositiveSmallIntegerField(default=1)
+    trial_period_days = models.PositiveIntegerField(null=True)
+
+    is_created = models.BooleanField(default=False)
+
+    objects = managers.PlanManager()
+
+    def save(self, *args, **kwargs):
+        """
+        :raises: django.core.exceptions.ValidationError
+        """
+        if not self.is_created:
+            type(self).objects.create_resource_from_model(self)
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        stripe_object = self.retrieve_stripe_api_instance()
+        stripe_object.delete()
+        return super().delete(*args, **kwargs)
+
+
+class Coupon(StripeModel):
+    """
+    """
+    STRIPE_API_NAME = "Coupon"
+
+    FOREVER = 0
+    ONCE = 1
+    REPEATING = 2
+    DURATION_CHOICES = (
+        (FOREVER, "forever"),
+        (ONCE, "once"),
+        (REPEATING, "repeating")
+        )
+
+    duration = models.PositiveSmallIntegerField(choices=DURATION_CHOICES)
+    amount_off = models.PositiveIntegerField(null=True)
+    currency = models.CharField(max_length=3, null=True, blank=True)
+    duration_in_months = models.PositiveSmallIntegerField(null=True)
+    max_redemptions = models.PositiveIntegerField(null=True)
+    percent_off = models.PositiveSmallIntegerField(null=True)
+    redeem_by = models.DateTimeField(null=True)
+
+    is_created = models.BooleanField(default=False)
+
+    objects = managers.CouponManager()
+
+    def clean(self, *args, **kwargs):
+        if not any([self.amount_off, self.percent_off]):
+            raise DJValidationError(message="One of `amount_off`, `percent_off` must be set.")
+        elif all([self.amount_off, self.percent_off]):
+            raise DJValidationError(message="Both `amount_off` and `percent_off` can not be set.")
+
+        if self.amount_off and not self.currency:
+            raise DJValidationError(message={"currency": "This field can not be null."})
+
+        if self.duration == self.REPEATING and not self.duration_in_months:
+            raise DJValidationError(message={"duration_in_months": "This field can not be null."})
+
+    def save(self, *args, **kwargs):
+        """
+        :raises: django.core.exceptions.ValidationError
+        """
+        self.clean()
+        if not self.is_created:
+            type(self).objects.create_resource_from_model(self)
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        stripe_object = self.retrieve_stripe_api_instance()
+        stripe_object.delete()
+        return super().delete(*args, **kwargs)

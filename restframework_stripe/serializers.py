@@ -1,3 +1,17 @@
+""" this module confronts many issues involving the validation of client side data and
+the multiple serializer types necessary for creating, updating and retrieving stripe
+resources for a client. some resources for instance have different allowed parameters
+for creating and updating, for instance bank accounts have such dramatically different
+serializers for creating and updating that it would be impossible to compress them into
+a single serializer. the solution that restframework_stripe proposes is to include 3
+serializers per model, a serializer for creating, updating and retrieving these
+resources.
+
+at the base of each of these triads is a simple model serializer for the model instance.
+no matter what the method, the model serializer will always return data back to the
+client. used in conjunction with the `views.StripeResourceViewset` it is easy to perform
+CRUD operatons with these serializers without very verbose views.
+"""
 from django.contrib.auth import get_user_model
 
 from rest_framework import serializers
@@ -66,7 +80,7 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
         instance.save()
         return instance
 
-    def update(self, instance, validated_data):
+    def update(self, instance, validated_data):  # pragma: no cover
         instance.stripe_object_sync(validated_data)
         instance.save()
         return instance
@@ -78,8 +92,13 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
         # prescreen fields from the client
         validated_data = super().run_validation(data)
         _instance = None
+
         if self.instance is not None:
-            _instance = self.instance.api_retrieve()
+            try:
+                _instance = self.instance.retrieve_stripe_api_instance()
+            except stripe.StripeError as err:
+                self.reraise_stripe_error(err)
+
         # validate clients data with stripe
         return self.validate_stripe(validated_data, _instance)
 
@@ -91,6 +110,7 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
         return self._stripe_instance_update(instance, data)
 
     def _stripe_instance_create(self, data):
+        data = self._process_data_for_stripe(data)
         try:
             instance = self.get_model_class().stripe_api_create(**data)
         except stripe.StripeError as err:
@@ -101,6 +121,7 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
     def _stripe_instance_update(self, instance, data):
         """ raise a validation error if stripe id was not included
         """
+        data = self._process_data_for_stripe(data)
         # update the retrieved stripe instance
         instance = util.recursive_mapping_update(instance, **data)
         try:
@@ -110,9 +131,45 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
         else:
             return instance
 
+    def _process_data_for_stripe(self, data):
+        """ simply flatten StripeModels down to their id only
+        """
+        _data = {}
+        for key, value in data.items():
+            if isinstance(value, models.StripeModel):
+                value = value.stripe_id
+            _data[key] = value
+        return _data
+
+
+class StripeListObjectSerializer(StripeResourceSerializer):
+    """
+    """
+    def _get_related_field_name(self):
+        return self.Meta.parent_model_field_name
+
+    def _get_list_object_name(self):
+        return self.Meta.list_object_name
+
+    def _stripe_instance_create(self, data):
+        """
+        """
+        relation = data.pop(self._get_related_field_name())
+        parent_object = relation.retrieve_stripe_api_instance()
+
+        list_object = getattr(parent_object, self._get_list_object_name())
+        data = self._process_data_for_stripe(data)
+
+        try:
+            stripe_object = list_object.create(**data)
+        except stripe.StripeError as err:
+            self.reraise_stripe_error(err)
+        else:
+            return stripe_object
+
 
 class StripeTokenResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
-    """
+    """ A serializer base class for creating objects from tokens returned by Stripe.js.
     """
     token = serializers.CharField()
     owner = serializers.PrimaryKeyRelatedField(queryset=get_user_model().objects.all())
@@ -123,12 +180,17 @@ class CardSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = models.Card
+        exclude = ("stripe_id", )
 
 
 class CreateCardResourceSerializer(StripeTokenResourceSerializer):
     """
     """
-    type = serializers.CharField(required=False, default="customer")
+    TYPE_CHOICES = (
+        ("customer", "customer"),
+        ("merchant", "merchant")
+        )
+    type = serializers.ChoiceField(TYPE_CHOICES, required=False, default="customer")
 
     class Meta:
         model = models.Card
@@ -141,11 +203,6 @@ class CreateCardResourceSerializer(StripeTokenResourceSerializer):
         token = validated_data.get("token")
         type_ = validated_data.get("type")
 
-        if type_ not in ("customer", "merchant"):
-            message = "Invalid type {}. Valid choices are 'customer' or "\
-                                                        "'merchant'".format(card_type)
-            raise ValidationError(detail={"type": message})
-
         try:
 
             # try to connect the card instance with the users connected account or
@@ -154,7 +211,7 @@ class CreateCardResourceSerializer(StripeTokenResourceSerializer):
             # purposes.
             if type_ == "merchant":
                 instance = owner.stripe_account.add_payment_source(token)
-            elif type_ == "customer":
+            elif type_ == "customer":  # pragma: no branch
                 instance = owner.stripe_customer.add_payment_source(token)
 
         except stripe.StripeError as err:  # raise a validation error, return to client
@@ -187,6 +244,7 @@ class BankAccountSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = models.BankAccount
+        exclude = ("stripe_id", )
 
 
 class CreateBankAccountResourceSerializer(CreateCardResourceSerializer):
@@ -200,17 +258,24 @@ class CreateBankAccountResourceSerializer(CreateCardResourceSerializer):
 class UpdateBankAccountResourceSerializer(StripeResourceSerializer):
     """
     """
+    default_for_currency = serializers.NullBooleanField(required=False)
+
     class Meta:
         model = models.BankAccount
         return_serializer = BankAccountSerializer
 
 
 class ConnectedAccountSerializer(serializers.ModelSerializer):
+    """
+    """
     class Meta:
         model = models.ConnectedAccount
+        exclude = ("stripe_id", )
 
 
 class CreateConnectedAccountResourceSerializer(StripeResourceSerializer):
+    """
+    """
     country = serializers.CharField()
     managed = serializers.BooleanField()
     legal_entity = serializers.DictField()
@@ -220,7 +285,7 @@ class CreateConnectedAccountResourceSerializer(StripeResourceSerializer):
         model = models.ConnectedAccount
         return_serializer = ConnectedAccountSerializer
 
-    def create(self, validated_data):  # pragma: no cover
+    def create(self, validated_data):
         owner = validated_data.pop("owner")
         instance = self.get_model_class().stripe_object_to_model(validated_data)
         instance.owner = owner
@@ -228,8 +293,82 @@ class CreateConnectedAccountResourceSerializer(StripeResourceSerializer):
         return instance
 
 
+class LegalEntitySerializer(serializers.Serializer):
+    """
+    """
+    address = serializers.DictField(required=False, allow_null=True)
+    business_name = serializers.CharField(required=False, allow_null=True)
+    business_tax_id = serializers.CharField(required=False, allow_null=True)
+    business_vat_id = serializers.CharField(required=False, allow_null=True)
+    dob = serializers.DictField(required=False, allow_null=True)
+    first_name = serializers.CharField(required=False, allow_null=True)
+    last_name = serializers.CharField(required=False, allow_null=True)
+    personal_address = serializers.DictField(required=False, allow_null=True)
+    personal_id_number = serializers.CharField(required=False, allow_null=True)
+    phone_number = serializers.CharField(required=False, allow_null=True)
+    ssn_last_4 = serializers.CharField(required=False, allow_null=True)
+
+
 class UpdateConnectedAccountResourceSerializer(StripeResourceSerializer):
+    """
+    """
+    business_logo = serializers.ImageField(required=False, allow_null=True)
+    business_name = serializers.CharField(required=False, allow_null=True)
+    business_primary_color = serializers.CharField(required=False, allow_null=True)
+    business_url = serializers.URLField(required=False, allow_null=True)
+    default_currency = serializers.CharField(required=False, allow_null=True)
+    email = serializers.EmailField(required=False, allow_null=True)
+    legal_entity = LegalEntitySerializer(required=False, allow_null=True)
+    product_description = serializers.CharField(required=False, allow_null=True)
+    statement_descriptor = serializers.CharField(required=False, allow_null=True)
+    support_email = serializers.EmailField(required=False, allow_null=True)
+    support_phone = serializers.CharField(required=False, allow_null=True)
 
     class Meta:
         model = models.ConnectedAccount
         return_serializer = ConnectedAccountSerializer
+
+
+class SubscriptionSerializer(serializers.ModelSerializer):
+    """
+    """
+    class Meta:
+        model = models.Subscription
+        exclude = ("stripe_id", )
+
+
+class CreateSubscriptionResourceSerializer(StripeListObjectSerializer):
+    """
+    """
+    plan = serializers.PrimaryKeyRelatedField(queryset=models.Plan.objects.all())
+    coupon = serializers.PrimaryKeyRelatedField(queryset=models.Coupon.objects.all(),
+                                                required=False, allow_null=True)
+    # though its not part of the model it is necessary for adding the subscription to
+    # the customer instance
+    customer = serializers.PrimaryKeyRelatedField(queryset=models.Customer.objects.all())
+
+    class Meta:
+        model = models.Subscription
+        return_serializer = SubscriptionSerializer
+        parent_model_field_name = "customer"
+        list_object_name = "subscriptions"
+
+    def create(self, validated_data):
+        owner = validated_data.pop("owner")
+        subscription = models.Subscription.stripe_object_to_model(validated_data)
+        subscription.owner = owner
+        subscription.save()
+        return subscription
+
+
+class UpdateSubscriptionResourceSerializer(StripeResourceSerializer):
+    """
+    """
+    plan = serializers.PrimaryKeyRelatedField(queryset=models.Plan.objects.all(),
+                                                required=False)
+    coupon = serializers.PrimaryKeyRelatedField(queryset=models.Coupon.objects.all(),
+                                                required=False, allow_null=True)
+
+    class Meta:
+        model = models.Subscription
+        return_serializer = SubscriptionSerializer

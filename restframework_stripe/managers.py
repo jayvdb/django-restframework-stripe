@@ -1,5 +1,6 @@
 import requests
 
+from django.core.exceptions import ValidationError as DJValidationError
 from django.db.models import manager
 from django.utils import timezone
 
@@ -62,3 +63,59 @@ class ConnectedAccountManager(manager.Manager):
         connected_account.owner = owner
         connected_account.save()
         return connected_account
+
+
+class PlanManager(manager.Manager):
+    """
+    """
+    def create_resource_from_model(self, model):
+        """
+        """
+        kwargs = {
+            "id": model.name,
+            "amount": model.amount,
+            "interval": model.get_interval_display(),
+            "name": model.name_on_invoice,
+            "statement_descriptor": model.statement_descriptor,
+            "interval_count": model.interval_count,
+            "trial_period_days": model.trial_period_days
+            }
+
+        try:
+            stripe_object = self.model.stripe_api_create(**kwargs)
+            model.stripe_id = stripe_object["id"]
+            model.source = stripe_object
+            model.is_created = True
+        except stripe.InvalidRequestError as err:
+            raise DJValidationError(message={err.param: err._message})
+
+        return model
+
+
+class CouponManager(manager.Manager):
+    """
+    """
+    def create_resource_from_model(self, model):
+        """
+        """
+        kwargs = {
+            "amount_off": getattr(model, "amount_off", None),
+            "currency": getattr(model, "currency", None),
+            "duration": model.get_duration_display(),
+            "duration_in_months": getattr(model, "duration_in_months", None),
+            "max_redemptions": getattr(model, "max_redemptions", None),
+            "percent_off": getattr(model, "percent_off", None),
+            "redeem_by": getattr(model, "redeem_by", None)
+            }
+        if kwargs["redeem_by"] is not None:
+            kwargs["redeem_by"] = int(kwargs["redeem_by"].timestamp())
+
+        try:
+            stripe_object = self.model.stripe_api_create(**kwargs)
+            model.stripe_id = stripe_object["id"]
+            model.source = stripe_object
+            model.is_created = True
+        except stripe.InvalidRequestError as err:
+            raise DJValidationError(message={err.param: err._message})
+
+        return model

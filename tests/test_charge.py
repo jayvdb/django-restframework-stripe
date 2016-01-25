@@ -1,0 +1,54 @@
+from unittest import mock
+
+import pytest
+import stripe
+from model_mommy import mommy
+
+from rest_framework.reverse import reverse
+
+from restframework_stripe import models
+from restframework_stripe.test import get_mock_resource
+
+
+@mock.patch("stripe.Charge.create")
+@pytest.mark.django_db
+def test_create_stripe_charge(create_charge, card):
+    kwargs = {
+        "amount": 1000,
+        "currency": "usd",
+        "source": card.stripe_id,
+        }
+    create_charge.return_value = get_mock_resource("Charge",
+            status="succeeded",
+            source=card.source,
+            amount=1000,
+            currency="usd")
+    stripe_object = models.Charge.stripe_api_create(**kwargs)
+    charge_model = models.Charge.stripe_object_to_model(stripe_object)
+    charge_model.owner = card.owner
+    charge_model.save()
+
+    assert charge_model.succeeded
+    assert charge_model.retrieve_payment_source().id == card.id
+
+
+@mock.patch("stripe.Charge.create")
+@pytest.mark.django_db
+def test_create_stripe_bank_account_charge(create_charge, bank_account):
+    kwargs = {
+        "amount": 1000,
+        "currency": "usd",
+        "source": bank_account.stripe_id,
+        }
+    create_charge.return_value = get_mock_resource("Charge",
+            status="succeeded",
+            source=bank_account.source,
+            amount=1000,
+            currency="usd")
+    stripe_object = models.Charge.stripe_api_create(**kwargs)
+    charge_model = models.Charge.stripe_object_to_model(stripe_object)
+    charge_model.owner = bank_account.owner
+    charge_model.save()
+
+    assert charge_model.succeeded
+    assert charge_model.retrieve_payment_source().id == bank_account.id

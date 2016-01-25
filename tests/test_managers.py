@@ -1,5 +1,7 @@
 from unittest import mock
 
+from django.core.exceptions import ValidationError
+
 import pytest
 from stripe.error import InvalidRequestError
 
@@ -45,3 +47,37 @@ def test_register_standalone_account_access_token_failure(post_mock, user):
         models.ConnectedAccount.objects.connect_standalone_account(user, "jjj")
         assert err.param == data["error"]
         assert err._message == data["error_description"]
+
+
+@mock.patch("stripe.Plan.create")
+@pytest.mark.django_db
+def test_plan_manager_create(plan_create_mock):
+    plan_create_mock.return_value = get_mock_resource("Plan", id="Gold Plan")
+    plan = models.Plan(
+        name="Gold Plan",
+        amount=100,
+        interval=models.Plan.MONTHLY,
+        name_on_invoice="Gold Plan Subscription",
+        statement_descriptor="GOLDPLANSUB",
+        )
+    plan.save()
+
+    assert plan.stripe_id is not None
+    assert plan.source is not None
+
+
+@mock.patch("stripe.Plan.create")
+@pytest.mark.django_db
+def test_plan_manager_error(plan_create_mock):
+    plan_create_mock.side_effect = InvalidRequestError(param="id", message="no!")
+    plan = models.Plan(
+        name="Gold Plan",
+        amount=100,
+        interval=models.Plan.MONTHLY,
+        name_on_invoice="Gold Plan Subscription",
+        statement_descriptor="GOLDPLANSUB",
+        )
+
+    with pytest.raises(ValidationError) as err:
+        plan.save()
+    assert err.value.message_dict == {"id": ["no!"]}
