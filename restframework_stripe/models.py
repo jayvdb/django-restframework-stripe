@@ -1,5 +1,7 @@
 from django.db import models
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.postgres.fields import JSONField
 from django.core.exceptions import ValidationError as DJValidationError
 
@@ -81,6 +83,24 @@ class StripeModel(models.Model):
         self.stripe_object_sync(stripe_object)
 
 
+class DefaultPaymentMixin(models.Model):
+    """
+    """
+    currency = models.CharField(max_length=3, null=True, blank=True)
+    default_for_currency = models.NullBooleanField()
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if self.default_for_currency is True and self.currency:
+            qs = type(self).objects.filter(owner=self.owner, currency=self.currency)
+            if self.id is not None:  # pragma: no branch
+                qs = qs.exclude(id=self.id)
+            qs.update(default_for_currency=False)
+        return super().save(*args, **kwargs)
+
+
 class Customer(StripeModel):
     """ Each project will need Customer objects in order to add payment methods and
     make reoccuring charges to those payment methods. There are many attributes of the
@@ -108,6 +128,10 @@ class Customer(StripeModel):
 
     owner = models.OneToOneField(settings.AUTH_USER_MODEL, related_name="stripe_customer")
 
+    source_type = models.ForeignKey(ContentType, null=True)
+    source_id = models.PositiveIntegerField(null=True)
+    default_source = GenericForeignKey("source_type", "source_id")
+
     def add_payment_source(self, token):
         stripe_object = self.retrieve_stripe_api_instance()
         new_source = stripe_object.sources.create(source=token)
@@ -124,8 +148,27 @@ class Customer(StripeModel):
         source.save()
         return source
 
+    @classmethod
+    def stripe_object_to_record(cls, stripe_object):
+        record = super().stripe_object_to_record(stripe_object)
+        default_source = stripe_object.get("default_source", None)
+        if default_source is not None and isinstance(default_source, stripe.StripeObject):
+            class_name = default_source.class_name()
+            if class_name == "bankaccount":
+                default_source = BankAccount.objects.get(stripe_id=default_source["id"])
+                record["default_source"] = default_source
+            elif class_name == "card":  # pragma: no branch
+                default_source = Card.objects.get(stripe_id=default_source["id"])
+                record["default_source"] = default_source
+        return record
 
-class Card(StripeModel):
+    @classmethod
+    def get_stripe_api_instance(cls, stripe_id):
+        stripe_resource = cls.get_stripe_api()
+        return stripe_resource.retrieve(stripe_id, expand=["default_source"])
+
+
+class Card(DefaultPaymentMixin, StripeModel):
     """ While BankAccounts and other options are available Cards (credit / debit) are a
     primary source of payment for most projects. Luckily with stripe Cards are easy to
     register and verify, all it takes is document like this::
@@ -159,6 +202,8 @@ class Card(StripeModel):
     def stripe_object_to_record(cls, stripe_object):
         record = super().stripe_object_to_record(stripe_object)
         record["cvc_check"] = stripe_object["cvc_check"]
+        record["currency"] = stripe_object.get("currency")
+        record["default_for_currency"] = stripe_object.get("default_for_currency")
         return record
 
     @property
@@ -292,8 +337,10 @@ class ConnectedAccount(StripeModel):
     @classmethod
     def stripe_object_to_record(cls, stripe_object):
         keys = stripe_object.pop("keys", None)
+
         record = super().stripe_object_to_record(stripe_object)
         record["managed"] = stripe_object["managed"]
+
         if keys is not None:
             record["publishable_key"] = keys.get("publishable")
             record["secret_key"] = keys.get("private")
@@ -318,7 +365,7 @@ class ConnectedAccount(StripeModel):
         return source
 
 
-class BankAccount(StripeModel):
+class BankAccount(DefaultPaymentMixin, StripeModel):
     """ BankAccounts are resources specifically for distributing payments to
     ConnectedAccounts; If a merchant would like to have their earnings deposited directly
     to their bank account rather than a debit card. BankAccounts are created on the
@@ -343,6 +390,8 @@ class BankAccount(StripeModel):
     def stripe_object_to_record(cls, stripe_object):
         record = super().stripe_object_to_record(stripe_object)
         record["status"] = stripe_object["status"]
+        record["currency"] = stripe_object.get("currency")
+        record["default_for_currency"] = stripe_object.get("default_for_currency")
         return record
 
     @property
@@ -442,11 +491,11 @@ class Event(StripeModel):
         """ process the stripe event by distributing this object and its source to all
         *registered* webhook handlers.
         """
-        if self.processed:
+        if self.processed:  # pragma: no cover
             return
 
         verified = self.verify()
-        if not verified:
+        if not verified:  # pragma: no cover
             return
 
         event_type, event_subtype = self.event_type.split(".", 1)
@@ -612,3 +661,38 @@ class Coupon(StripeModel):
         stripe_object = self.retrieve_stripe_api_instance()
         stripe_object.delete()
         return super().delete(*args, **kwargs)
+
+
+class Refund(StripeModel):
+    """
+    """
+    STRIPE_API_NAME = "Refund"
+
+    DUPLICATE = 0
+    FRAUDULENT = 1
+    REQUESTED = 2
+    REFUND_REASON_CHOICES = (
+        (DUPLICATE, "duplicate"),
+        (FRAUDULENT, "fraudulent"),
+        (REQUESTED, "requested_by_customer")
+        )
+
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="stripe_refunds")
+
+    charge = models.ForeignKey("Charge", related_name="refunds")
+    amount = models.PositiveIntegerField()
+    reason = models.PositiveSmallIntegerField(choices=REFUND_REASON_CHOICES)
+    refund_application_fee = models.NullBooleanField()
+    reverse_transfer = models.NullBooleanField()
+
+    is_created = models.BooleanField(default=False)
+
+    objects = managers.RefundManager()
+
+    def save(self, *args, **kwargs):
+        """
+        :raises: django.core.exceptions.ValidationError
+        """
+        if not self.is_created:
+            type(self).objects.create_resource_from_model(self)
+        super().save(*args, **kwargs)

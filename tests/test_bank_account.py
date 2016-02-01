@@ -53,18 +53,52 @@ def test_customer_adding_bank_account(customer_retrieve_mock, ba_create_mock,
     assert ba.is_usable
 
 
+@mock.patch("stripe.BankAccount.save")
+@mock.patch("stripe.BankAccount.retrieve")
+@pytest.mark.django_db
+def test_bank_account_update(bank_account_retrieve, bank_account_update, bank_account,
+                                api_client):
+    api_client.force_authenticate(bank_account.owner)
+    data = {
+        "default_for_currency": True,
+        }
+    bank_account_retrieve.return_value = get_mock_resource("BankAccount")
+    bank_account_update.return_value = get_mock_resource("BankAccount", **data)
+
+    uri = reverse("rf_stripe:bank-account-detail", kwargs={"pk": bank_account.pk})
+    response = api_client.patch(uri, data=data, format="json")
+
+    bank_account.refresh_from_db()
+    assert response.status_code == 200, response.data
+    assert bank_account.source["default_for_currency"] is True
+
+
 @mock.patch("stripe.BankAccount.delete")
 @mock.patch("stripe.BankAccount.retrieve")
 @pytest.mark.django_db
-def test_bank_account_delete(bank_account_retrieve, bank_account_delete, user, api_client):
+def test_bank_account_delete(bank_account_retrieve, bank_account_delete, bank_account,
+                                api_client):
+    user = bank_account.owner
     api_client.force_authenticate(user)
     bank_account_retrieve.return_value = get_mock_resource("BankAccount")
     bank_account_delete.return_value = None  # no one cares about this value... EVER
-    bank_account = mommy.make(models.BankAccount, owner=user,
-            source=get_mock_resource("BankAccount"))
 
     uri = reverse("rf_stripe:bank-account-detail", kwargs={"pk": bank_account.pk})
     response = api_client.delete(uri)
 
     assert response.status_code == 204
     assert not models.BankAccount.objects.filter(id=bank_account.id).exists()
+
+
+@mock.patch("stripe.BankAccount.retrieve")
+@pytest.mark.django_db
+def test_bank_account_refresh(bank_account_retrieve, bank_account, api_client):
+    api_client.force_authenticate(bank_account.owner)
+    bank_account_retrieve.return_value = get_mock_resource("BankAccount",
+                                                            status="verification_failed")
+    uri = reverse("rf_stripe:bank-account-refresh", kwargs={"pk": bank_account.pk})
+    response = api_client.get(uri)
+
+    bank_account.refresh_from_db()
+    assert bank_account.status == "verification_failed"
+    assert bank_account.is_usable is False

@@ -84,6 +84,29 @@ def test_card_create_error(card_create, customer_retrieve, customer, api_client)
     assert response.data["token"] == "invalid token!"
 
 
+@mock.patch("stripe.Card.save")
+@mock.patch("stripe.Card.retrieve")
+@pytest.mark.django_db
+def test_card_update(card_retrieve, card_update, card, api_client):
+    api_client.force_authenticate(card.owner)
+    data = {
+        "name": "Hans Solo",
+        "exp_month": 1,
+        "exp_year": 2019
+        }
+    card_retrieve.return_value = get_mock_resource("Card")
+    card_update.return_value = get_mock_resource("Card", **data)
+
+    uri = reverse("rf_stripe:card-detail", kwargs={"pk": card.pk})
+    response = api_client.patch(uri, data=data, format="json")
+
+    card.refresh_from_db()
+    assert response.status_code == 200
+    assert card.source["name"] == data["name"]
+    assert card.source["exp_month"] == data["exp_month"]
+    assert card.source["exp_year"] == data["exp_year"]
+
+
 @mock.patch("stripe.Card.delete")
 @mock.patch("stripe.Card.retrieve")
 @pytest.mark.django_db

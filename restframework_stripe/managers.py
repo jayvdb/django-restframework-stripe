@@ -119,3 +119,25 @@ class CouponManager(manager.Manager):
             raise DJValidationError(message={err.param: err._message})
 
         return model
+
+
+class RefundManager(manager.Manager):
+    def create_resource_from_model(self, model):
+        kwargs = {
+            "charge": model.charge.stripe_id,
+            "amount": model.amount,
+            "reason": model.get_reason_display(),
+            "refund_application_fee": getattr(model, "refund_application_fee", None),
+            "reverse_transfer": getattr(model, "reverse_transfer", None)
+            }
+
+        try:
+            stripe_object = self.model.stripe_api_create(**kwargs)
+            model.stripe_id = stripe_object["id"]
+            model.source = stripe_object
+            model.owner = model.charge.owner
+            model.is_created = True
+        except stripe.InvalidRequestError as err:
+            raise DJValidationError(message={err.param: err._message})
+
+        return model

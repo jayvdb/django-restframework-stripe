@@ -11,6 +11,72 @@ from restframework_stripe.test import get_mock_resource
 
 
 @pytest.fixture
+def refund(charge, request):
+    source = get_mock_resource("Refund", charge=charge.stripe_id,
+            amount=charge.source["amount"])
+    refund = mommy.make(models.Refund,
+            owner=charge.owner, is_created=True, charge=charge,
+            reason=models.Refund.DUPLICATE, amount=source["amount"],
+            stripe_id=source["id"], source=source)
+
+    def fin():
+        refund.delete()
+    request.addfinalizer(fin)
+
+    return refund
+
+
+@pytest.fixture
+def subscription(plan, request):
+    source = get_mock_resource("Subscription", plan=plan.stripe_id)
+    subscription = mommy.make(models.Subscription, stripe_id=source["id"],
+            source=source, plan=plan)
+
+    def fin():
+        subscription.delete()
+    request.addfinalizer(fin)
+
+    return subscription
+
+
+@pytest.fixture
+def charge(request):
+    source = get_mock_resource("Charge")
+    charge = mommy.make(models.Charge, stripe_id=source["id"], source=source)
+
+    def fin():
+        charge.delete()
+    request.addfinalizer(fin)
+
+    return charge
+
+
+@pytest.fixture
+def transfer(request):
+    source = get_mock_resource("Transfer")
+    transfer = mommy.make(models.Transfer, stripe_id=source["id"], source=source)
+
+    def fin():
+        transfer.delete()
+    request.addfinalizer(fin)
+
+    return transfer
+
+
+@pytest.fixture
+def event(request):
+    source = get_mock_resource("Event")
+    event = mommy.make(models.Event, source=source, stripe_id=source["id"],
+                        verified=False, processed=False, event_type=source["type"])
+
+    def fin():
+        event.delete()
+    request.addfinalizer(fin)
+
+    return event
+
+
+@pytest.fixture
 def coupon(request):
     source = get_mock_resource("Coupon")
     coupon = mommy.make(models.Coupon,

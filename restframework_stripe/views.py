@@ -1,4 +1,5 @@
-from rest_framework.viewsets import ModelViewSet
+from rest_framework import status
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import detail_route
@@ -26,7 +27,7 @@ class StripeResourceViewset(ModelViewSet):
         """
         if self.action == "create":
             return self.create_stripe_serializer
-        elif self.action in ("update", "partialUpdate"):
+        elif self.action in ("update", "partial_update"):
             return self.update_stripe_serializer
         return super().get_serializer_class()
 
@@ -51,8 +52,18 @@ class StripeResourceViewset(ModelViewSet):
         instance = self.get_object()
         instance.refresh_from_stripe_api()
         instance.save()
-        serializer = self.get_serializer_class(instance)
+        serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+
+class SingleObjectUpdateOnly:
+    def create(self, request, *args, **kwargs):  # pragma: no cover
+        return Response({"detail": "POST method not allowed."},
+                        code=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def delete(self, request, *args, **kwargs):  # pragma: no cover
+        return Response({"detail": "DELETE method not allowed."},
+                        code=status.HTTP_405_METHOD_NOT_ALLOWED)
 
 
 class CardViewset(StripeResourceViewset):
@@ -124,3 +135,53 @@ class SubscriptionViewset(StripeResourceViewset):
     def create(self, request, *args, **kwargs):
         request.data["customer"] = request.user.stripe_customer.id
         return super().create(request, *args, **kwargs)
+
+
+class CustomerViewset(SingleObjectUpdateOnly, StripeResourceViewset):
+    """
+    """
+    model = models.Customer
+    queryset = models.Customer.objects.all()
+    serializer_class = serializers.CustomerSerializer
+    update_stripe_serializer = serializers.UpdateCustomerResourceSerializer
+
+    permission_classes = (permissions.CustomerOnlyPermission, )
+
+
+class ChargeViewset(ReadOnlyModelViewSet):
+    """
+    """
+    model = models.Charge
+    queryset = models.Charge.objects.all()
+    serializer_class = serializers.ChargeSerializer
+
+    permission_classes = (permissions.CustomerOnlyPermission, )
+
+    def filter_queryset(self, queryset):
+        return queryset.filter(owner=self.request.user)
+
+
+class TransferViewset(ReadOnlyModelViewSet):
+    """
+    """
+    model = models.Transfer
+    queryset = models.Transfer.objects.all()
+    serializer_class = serializers.TransferSerializer
+
+    permission_classes = (permissions.MerchantOnlyPermission, )
+
+    def filter_queryset(self, queryset):
+        return queryset.filter(owner=self.request.user)
+
+
+class RefundViewset(ReadOnlyModelViewSet):
+    """
+    """
+    model = models.Refund
+    queryset = models.Refund.objects.all()
+    serializer_class = serializers.RefundSerializer
+
+    permission_classes = (permissions.CustomerOnlyPermission, )
+
+    def filter_queryset(self, queryset):
+        return queryset.filter(owner=self.request.user)

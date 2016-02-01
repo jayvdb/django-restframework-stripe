@@ -33,3 +33,9 @@ class CustomerOnlyPermission(OwnerOnlyPermission):
     def has_permission(self, request, view):
         is_authenticated = super().has_permission(request, view)
         return is_authenticated and request.rf_stripe.is_customer
+
+
+class MerchantOnlyPermission(OwnerOnlyPermission):
+    def has_permission(self, request, view):
+        is_authenticated = super().has_permission(request, view)
+        return is_authenticated and request.rf_stripe.is_merchant

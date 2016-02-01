@@ -96,7 +96,8 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
         if self.instance is not None:
             try:
                 _instance = self.instance.retrieve_stripe_api_instance()
-            except stripe.StripeError as err:
+            # an error due to an object not existing, invalid api key, or network outage
+            except stripe.StripeError as err:  # pragma: no cover
                 self.reraise_stripe_error(err)
 
         # validate clients data with stripe
@@ -162,7 +163,8 @@ class StripeListObjectSerializer(StripeResourceSerializer):
 
         try:
             stripe_object = list_object.create(**data)
-        except stripe.StripeError as err:
+        # an error due to an object not existing, invalid api key, or network outage
+        except stripe.StripeError as err:  # pragma: no cover
             self.reraise_stripe_error(err)
         else:
             return stripe_object
@@ -173,6 +175,18 @@ class StripeTokenResourceSerializer(ReturnSerializerMixin, serializers.Serialize
     """
     token = serializers.CharField()
     owner = serializers.PrimaryKeyRelatedField(queryset=get_user_model().objects.all())
+
+
+class DefaultSourceRelatedField(serializers.RelatedField):
+    """ A Field type for representing payment & payout accounts for merchants and
+    customers
+    """
+    def to_representation(self, value):
+        if isinstance(value, models.BankAccount):
+            return BankAccountSerializer(value).data
+        elif isinstance(value, models.Card):
+            return CardSerializer(value).data
+        raise NotImplementedError(value.__class__.__name__)
 
 
 class CardSerializer(serializers.ModelSerializer):
@@ -323,10 +337,24 @@ class UpdateConnectedAccountResourceSerializer(StripeResourceSerializer):
     statement_descriptor = serializers.CharField(required=False, allow_null=True)
     support_email = serializers.EmailField(required=False, allow_null=True)
     support_phone = serializers.CharField(required=False, allow_null=True)
+    # external account will make THIS account the default payout method. this field
+    # is a token returned by stripe.js or similar sdk
+    external_account = serializers.CharField(required=False)
 
     class Meta:
         model = models.ConnectedAccount
         return_serializer = ConnectedAccountSerializer
+
+    def _stripe_instance_update(self, instance, data):
+        """ overrides the default behavior of the Stripe API which deletes the old
+        external_account (default payout method), such that you are not required to
+        clean up stale objects that are recorded locally.
+        """
+        new_ext = data.pop("external_account", None)
+        if new_ext is not None:
+            self.instance.add_payment_source(new_ext)
+        instance = super()._stripe_instance_update(instance, data)
+        return instance
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
@@ -372,3 +400,86 @@ class UpdateSubscriptionResourceSerializer(StripeResourceSerializer):
     class Meta:
         model = models.Subscription
         return_serializer = SubscriptionSerializer
+
+
+# Customers can not be created by clients, this should be explicitly handled on the
+# server side with an event hook after an account has been created.
+class CustomerSerializer(serializers.ModelSerializer):
+    """
+    """
+    default_source = DefaultSourceRelatedField(allow_null=True, read_only=True)
+
+    class Meta:
+        model = models.Customer
+        exclude = ("stripe_id", )
+
+
+class CustomerShippingSerializer(serializers.Serializer):
+    """
+    """
+    address = serializers.DictField()
+    name = serializers.CharField()
+    phone = serializers.CharField(required=False, allow_null=True)
+
+
+class UpdateCustomerResourceSerializer(StripeResourceSerializer):
+    """
+    """
+    TYPE_CHOICES = (
+        ("bank_account", "bank_account"),
+        ("card", "card")
+        )
+
+    coupon = serializers.CharField(required=False)
+    default_source = serializers.IntegerField(required=False, allow_null=True)
+    default_source_type = serializers.ChoiceField(choices=TYPE_CHOICES, required=False,
+                                                    allow_null=True)
+    email = serializers.EmailField(required=False)
+    shipping = CustomerShippingSerializer(required=False)
+    source = serializers.CharField(required=False)
+
+    class Meta:
+        model = models.Customer
+        return_serializer = CustomerSerializer
+
+    def _stripe_instance_update(self, instance, data):
+        new_src = data.pop("source", None)
+        default_src = data.pop("default_source", None)
+        src_type = data.pop("default_source_type", None)
+
+        if default_src and src_type == "bank_account":
+            default_src = models.BankAccount.objects.get(id=default_src).stripe_id
+        elif default_src and src_type == "card":  # pragma: no branch
+            default_src = models.Card.objects.get(id=default_src).stripe_id
+
+        data["default_source"] = default_src
+        if new_src is not None:
+            self.instance.add_payment_source(new_src)
+        instance = super()._stripe_instance_update(instance, data)
+        return instance
+
+
+# READ ONLY OWNED RESOURCES #
+
+class ChargeSerializer(serializers.ModelSerializer):
+    """
+    """
+    class Meta:
+        model = models.Charge
+        exclude = ("stripe_id", )
+
+
+class TransferSerializer(serializers.ModelSerializer):
+    """
+    """
+    class Meta:
+        model = models.Transfer
+        exclude = ("stripe_id", )
+
+
+class RefundSerializer(serializers.ModelSerializer):
+    """
+    """
+    class Meta:
+        model = models.Refund
+        exclude = ("stripe_id", )

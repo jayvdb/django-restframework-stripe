@@ -29,3 +29,15 @@ def test_create_transfer(transfer_create, managed_account, bank_account):
     transfer.save()
 
     assert transfer.succeeded
+
+
+@pytest.mark.django_db
+def test_transfer_retrieve(managed_account, transfer, api_client):
+    api_client.force_authenticate(managed_account.owner)
+    transfer.owner = managed_account.owner
+    transfer.save()
+
+    uri = reverse("rf_stripe:transfer-detail", kwargs={"pk": transfer.pk})
+    response = api_client.get(uri)
+
+    assert response.status_code == 200, response.data

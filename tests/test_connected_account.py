@@ -141,3 +141,32 @@ def test_update_connected_account_error(account_retrieve, account_update, manage
 
     assert response.status_code == 400, response.data
     assert response.data["business_name"] == "no targuses allowed!"
+
+
+@mock.patch("stripe.ListObject.create")
+@mock.patch("stripe.Account.save")
+@mock.patch("stripe.Account.retrieve")
+@pytest.mark.django_db
+def test_connected_account_add_payment_method(a_retrieve, a_update, l_create,
+                                                managed_account, api_client):
+    api_client.force_authenticate(managed_account.owner)
+    data = {
+        "external_account": "fkdsla;jfioewni3o2ndsa",
+        "email": "test@test.com",
+        "legal_entity": {
+            "first_name": "ted",
+            "last_name": "bed"
+            }
+        }
+    updated_data = data.copy()
+    updated_data.pop("external_account")
+
+    a_retrieve.return_value = get_mock_resource("Account", managed=True)
+    a_update.return_value = get_mock_resource("Account", managed=True, **updated_data)
+    l_create.return_value = get_mock_resource("BankAccount")
+
+    uri = reverse("rf_stripe:connected-account-detail", kwargs={"pk": managed_account.pk})
+    response = api_client.patch(uri, data=data, format="json")
+
+    assert response.status_code == 200, response.data
+    assert 0 < models.BankAccount.objects.filter(owner=managed_account.owner).count()

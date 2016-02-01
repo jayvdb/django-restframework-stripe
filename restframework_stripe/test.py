@@ -34,7 +34,30 @@ CUSTOMER = {
     "account_balance": 0,
     "created": 1452662849,
     "currency": "usd",
-    "default_source": "card_17ShAG2eZvKYlo2CkaMDP2dR",
+    "default_source": {
+        "id": "card_17ShAG2eZvKYlo2CkaMDP2dR",
+        "object": "card",
+        "address_city": None,
+        "address_country": None,
+        "address_line1": None,
+        "address_line1_check": None,
+        "address_line2": None,
+        "address_state": None,
+        "address_zip": None,
+        "address_zip_check": None,
+        "brand": "Visa",
+        "country": "US",
+        "customer": "cus_7i7PcjtB5sFNhL",
+        "cvc_check": "pass",
+        "dynamic_last4": None,
+        "exp_month": 10,
+        "exp_year": 2019,
+        "funding": "credit",
+        "last4": "4242",
+        "metadata": {},
+        "name": "sankukatti@gmail.com",
+        "tokenization_method": None
+    },
     "delinquent": False,
     "description": None,
     "discount": None,
@@ -350,20 +373,133 @@ SUBSCRIPTION = {
 
 
 COUPON = {
-    "id": "Tfrf9ICh",
-    "object": "coupon",
-    "amount_off": None,
-    "created": 1452719554,
-    "currency": "usd",
-    "duration": "once",
-    "duration_in_months": None,
+    "id":  "Tfrf9ICh",
+    "object":  "coupon",
+    "amount_off":  None,
+    "created":  1452719554,
+    "currency":  "usd",
+    "duration":  "once",
+    "duration_in_months":  None,
+    "livemode":  False,
+    "max_redemptions":  None,
+    "metadata":  {},
+    "percent_off":  75,
+    "redeem_by":  None,
+    "times_redeemed":  0,
+    "valid":  True
+}
+
+
+EVENT = {
+    "id": "evt_17YhUu2eZvKYlo2Cxrh35V1T",
+    "object": "event",
+    "api_version": "2015-10-16",
+    "created": 1454094092,
+    "data": {
+        "object": {
+            "id": "in_17YgSq2eZvKYlo2CARrQ3gRe",
+            "object": "invoice",
+            "amount_due": 2000,
+            "application_fee": None,
+            "attempt_count": 1,
+            "attempted": True,
+            "charge": "ch_17YhUu2eZvKYlo2CZNfOjJMm",
+            "closed": True,
+            "currency": "usd",
+            "customer": "cus_6hNQ8r1t4BNaBa",
+            "date": 1454090120,
+            "description": None,
+            "discount": None,
+            "ending_balance": 0,
+            "forgiven": False,
+            "lines": {
+                "object": "list",
+                "data": [
+                    {
+                        "id": "sub_6hNQy3MsNEQFlI",
+                        "object": "line_item",
+                        "amount": 2000,
+                        "currency": "usd",
+                        "description": None,
+                        "discountable": True,
+                        "livemode": False,
+                        "metadata": {
+
+                        },
+                        "period": {
+                            "start": 1454089737,
+                            "end": 145676813
+                        },
+                        "plan": {
+                            "id": "monthly",
+                            "object": "plan",
+                            "amount": 2000,
+                            "created": 1436978837,
+                            "currency": "usd",
+                            "interval": "month",
+                            "interval_count": 1,
+                            "livemode": False,
+                            "metadata": {
+                                "Order": "4"
+                            },
+                            "name": "Monthly Plan",
+                            "statement_descriptor": None,
+                            "trial_period_days": None,
+                        },
+                        "proration": False,
+                        "quantity": 1,
+                        "subscription": None,
+                        "type": "subscription"
+                    }
+                ],
+                "has_more": False,
+                "total_count": 1,
+                "url": "/v1/invoices/in_17YgSq2eZvKYlo2CARrQ3gRe/lines"
+            },
+            "livemode": False,
+            "metadata": {
+            },
+            "next_payment_attempt": None,
+            "paid": True,
+            "period_end": 1454089737,
+            "period_start": 1451411337,
+            "receipt_number": None,
+            "starting_balance": 0,
+            "statement_descriptor": None,
+            "subscription": "sub_6hNQy3MsNEQFlI",
+            "subtotal": 2000,
+            "tax": None,
+            "tax_percent": None,
+            "total": 2000,
+            "webhooks_delivered_at": 145409017
+        },
+        "previous_attributes": {
+            "attempted": False,
+            "charge": None,
+            "closed": False,
+            "ending_balance": None,
+            "next_payment_attempt": 1454093720,
+            "paid": False
+        }
+    },
     "livemode": False,
-    "max_redemptions": None,
+    "pending_webhooks": 0,
+    "request": None,
+    "type": "invoice.updated"
+}
+
+
+REFUND = {
+    "id": "re_17YeZa2eZvKYlo2CL5KbqnlM",
+    "object": "refund",
+    "amount": 100,
+    "balance_transaction": None,
+    "charge": "ch_17W7Eg2eZvKYlo2CiRt4qwqp",
+    "created": 1454082850,
+    "currency": "usd",
     "metadata": {},
-    "percent_off": 75,
-    "redeem_by": None,
-    "times_redeemed": 0,
-    "valid": True
+    "reason": None,
+    "receipt_number": None
 }
 
 
@@ -376,7 +512,9 @@ MOCKS = {
     "Plan": PLAN,
     "Transfer": TRANSFER,
     "Subscription": SUBSCRIPTION,
-    "Coupon": COUPON
+    "Coupon": COUPON,
+    "Event": EVENT,
+    "Refund": REFUND
     }
 
 

@@ -52,3 +52,15 @@ def test_create_stripe_bank_account_charge(create_charge, bank_account):
 
     assert charge_model.succeeded
     assert charge_model.retrieve_payment_source().id == bank_account.id
+
+
+@pytest.mark.django_db
+def test_transfer_retrieve(customer, charge, api_client):
+    api_client.force_authenticate(customer.owner)
+    charge.owner = customer.owner
+    charge.save()
+
+    uri = reverse("rf_stripe:charge-detail", kwargs={"pk": charge.pk})
+    response = api_client.get(uri)
+
+    assert response.status_code == 200, response.data
