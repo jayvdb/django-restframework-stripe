@@ -19,4 +19,4 @@ stripe.api_version = STRIPE["api_version"]
 stripe.verify_ssl_certs = STRIPE["verify_ssl_certs"]
 stripe.default_http_client = STRIPE["default_http_client"]
 
-VERSION = "0.1"
+VERSION = "1.0"
