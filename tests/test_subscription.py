@@ -82,3 +82,11 @@ def test_update_subscription(
     response = api_client.patch(uri, data=data, format="json")
 
     assert response.status_code == 200, response.data
+
+
+@pytest.mark.django_db
+def test_options(customer, api_client):
+    api_client.force_authenticate(customer.owner)
+    uri = reverse("rf_stripe:subscription-list")
+    response = api_client.options(uri)
+    assert response.status_code == 200, response.data

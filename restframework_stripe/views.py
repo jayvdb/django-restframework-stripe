@@ -13,7 +13,35 @@ class StripeResourceViewset(ModelViewSet):
     `create_stripe_serializer` and `update_stripe_serializer`. these serializers will be
     used to handle create and update interactions with the stripe api resource.
     """
+    create_stripe_serializer = None
+    update_stripe_serializer = None
     permission_classes = (permissions.OwnerOnlyPermission,)
+
+    def options(self, request, *args, **kwargs):
+        """ better formating for API browsing
+        """
+        if self.metadata_class is None:  # pragma: no cover
+            return self.http_method_not_allowed(request, *args, **kwargs)
+
+        mdc = self.metadata_class()
+        data = mdc.determine_metadata(request, self)
+
+        create = self.create_stripe_serializer
+        update = self.update_stripe_serializer
+        create = mdc.get_serializer_info(create()) if create else None
+        update = mdc.get_serializer_info(update()) if update else None
+
+        if not data.get("actions"):  # pragma: no cover
+            data["actions"] = {}
+
+        if create:
+            data["actions"]["POST"] = create
+
+        if update:  # pragma: no branch
+            data["actions"]["PUT"] = update
+            data["actions"]["PATCH"] = update
+
+        return Response(data)
 
     def create(self, request, *args, **kwargs):
         """ since all stripe resource objects have a required `owner` foreign key, auto

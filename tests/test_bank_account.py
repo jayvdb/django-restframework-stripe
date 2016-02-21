@@ -139,3 +139,11 @@ def test_bank_account_refresh(
     bank_account.refresh_from_db()
     assert bank_account.status == "verification_failed"
     assert bank_account.is_usable is False
+
+
+@pytest.mark.django_db
+def test_options(user, api_client):
+    api_client.force_authenticate(user)
+    uri = reverse("rf_stripe:bank-account-list")
+    response = api_client.options(uri)
+    assert response.status_code == 200, response.data

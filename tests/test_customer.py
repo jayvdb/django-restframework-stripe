@@ -105,3 +105,11 @@ def test_customer_add_payment_method(a_retrieve, a_update, l_create, customer, a
     assert response.status_code == 200, response.data
     assert 0 < models.Card.objects.filter(owner=customer.owner).count()
     assert customer.source["email"] == data["email"]
+
+
+@pytest.mark.django_db
+def test_options(customer, api_client):
+    api_client.force_authenticate(customer.owner)
+    uri = reverse("rf_stripe:customer-list")
+    response = api_client.options(uri)
+    assert response.status_code == 200, response.data

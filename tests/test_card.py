@@ -150,3 +150,11 @@ def test_card_delete(
 
     assert response.status_code == 204
     assert not models.Card.objects.filter(id=card.id).exists()
+
+
+@pytest.mark.django_db
+def test_options(user, api_client):
+    api_client.force_authenticate(user)
+    uri = reverse("rf_stripe:card-list")
+    response = api_client.options(uri)
+    assert response.status_code == 200, response.data

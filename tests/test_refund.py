@@ -51,3 +51,11 @@ def test_customer_viewing_refund(refund, customer, api_client):
     response = api_client.get(uri)
 
     assert response.status_code == 200, response.data
+
+
+@pytest.mark.django_db
+def test_options(customer, api_client):
+    api_client.force_authenticate(customer.owner)
+    uri = reverse("rf_stripe:refund-list")
+    response = api_client.options(uri)
+    assert response.status_code == 200, response.data

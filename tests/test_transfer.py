@@ -41,3 +41,11 @@ def test_transfer_retrieve(managed_account, transfer, api_client):
     response = api_client.get(uri)
 
     assert response.status_code == 200, response.data
+
+
+@pytest.mark.django_db
+def test_options(managed_account, api_client):
+    api_client.force_authenticate(managed_account.owner)
+    uri = reverse("rf_stripe:transfer-list")
+    response = api_client.options(uri)
+    assert response.status_code == 200, response.data
