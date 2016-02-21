@@ -53,17 +53,29 @@ def test_customer_adding_bank_account(customer_retrieve_mock, ba_create_mock,
     assert ba.is_usable
 
 
+@mock.patch("stripe.Account.retrieve")
 @mock.patch("stripe.BankAccount.save")
-@mock.patch("stripe.BankAccount.retrieve")
+@mock.patch("stripe.ListObject.retrieve")
 @pytest.mark.django_db
-def test_bank_account_update(bank_account_retrieve, bank_account_update, bank_account,
-                                api_client):
+def test_bank_account_update(
+        bank_account_retrieve,
+        bank_account_update,
+        account_retrieve,
+        bank_account,
+        managed_account,
+        api_client):
+
+    bank_account.owner = managed_account.owner
+    bank_account.save()
+
     api_client.force_authenticate(bank_account.owner)
     data = {
         "default_for_currency": True,
         }
-    bank_account_retrieve.return_value = get_mock_resource("BankAccount")
+
+    bank_account_retrieve.return_value = bank_account.source
     bank_account_update.return_value = get_mock_resource("BankAccount", **data)
+    account_retrieve.return_value = managed_account.source
 
     uri = reverse("rf_stripe:bank-account-detail", kwargs={"pk": bank_account.pk})
     response = api_client.patch(uri, data=data, format="json")
@@ -73,14 +85,26 @@ def test_bank_account_update(bank_account_retrieve, bank_account_update, bank_ac
     assert bank_account.source["default_for_currency"] is True
 
 
+@mock.patch("stripe.Customer.retrieve")
 @mock.patch("stripe.BankAccount.delete")
-@mock.patch("stripe.BankAccount.retrieve")
+@mock.patch("stripe.ListObject.retrieve")
 @pytest.mark.django_db
-def test_bank_account_delete(bank_account_retrieve, bank_account_delete, bank_account,
-                                api_client):
-    user = bank_account.owner
-    api_client.force_authenticate(user)
-    bank_account_retrieve.return_value = get_mock_resource("BankAccount")
+def test_bank_account_delete(
+        bank_account_retrieve,
+        bank_account_delete,
+        customer_retrieve,
+        bank_account,
+        customer,
+        api_client):
+
+    bank_account.owner = customer.owner
+    bank_account.source.pop("account", None)
+    bank_account.source["customer"] = customer.stripe_id
+    bank_account.save()
+
+    api_client.force_authenticate(bank_account.owner)
+    bank_account_retrieve.return_value = bank_account.source
+    customer_retrieve.return_value = customer.source
     bank_account_delete.return_value = None  # no one cares about this value... EVER
 
     uri = reverse("rf_stripe:bank-account-detail", kwargs={"pk": bank_account.pk})
@@ -90,10 +114,23 @@ def test_bank_account_delete(bank_account_retrieve, bank_account_delete, bank_ac
     assert not models.BankAccount.objects.filter(id=bank_account.id).exists()
 
 
-@mock.patch("stripe.BankAccount.retrieve")
+@mock.patch("stripe.Customer.retrieve")
+@mock.patch("stripe.ListObject.retrieve")
 @pytest.mark.django_db
-def test_bank_account_refresh(bank_account_retrieve, bank_account, api_client):
+def test_bank_account_refresh(
+        bank_account_retrieve,
+        customer_retrieve,
+        customer,
+        bank_account,
+        api_client):
+
+    bank_account.owner = customer.owner
+    bank_account.source.pop("account", None)
+    bank_account.source["customer"] = customer.stripe_id
+    bank_account.save()
+
     api_client.force_authenticate(bank_account.owner)
+    customer_retrieve.return_value = customer.source
     bank_account_retrieve.return_value = get_mock_resource("BankAccount",
                                                             status="verification_failed")
     uri = reverse("rf_stripe:bank-account-refresh", kwargs={"pk": bank_account.pk})

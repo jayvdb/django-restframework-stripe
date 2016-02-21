@@ -84,17 +84,32 @@ def test_card_create_error(card_create, customer_retrieve, customer, api_client)
     assert response.data["token"] == "invalid token!"
 
 
+@mock.patch("stripe.Customer.retrieve")
 @mock.patch("stripe.Card.save")
-@mock.patch("stripe.Card.retrieve")
+@mock.patch("stripe.ListObject.retrieve")
 @pytest.mark.django_db
-def test_card_update(card_retrieve, card_update, card, api_client):
+def test_card_update(
+        card_retrieve,
+        card_update,
+        customer_retrieve,
+        customer,
+        card,
+        api_client):
+
+    card.owner = customer.owner
+    card.source.pop("account", None)
+    card.source["customer"] = customer.stripe_id
+    card.save()
+
     api_client.force_authenticate(card.owner)
     data = {
         "name": "Hans Solo",
         "exp_month": 1,
         "exp_year": 2019
         }
-    card_retrieve.return_value = get_mock_resource("Card")
+
+    customer_retrieve.return_value = customer.source
+    card_retrieve.return_value = card.source
     card_update.return_value = get_mock_resource("Card", **data)
 
     uri = reverse("rf_stripe:card-detail", kwargs={"pk": card.pk})
@@ -107,14 +122,28 @@ def test_card_update(card_retrieve, card_update, card, api_client):
     assert card.source["exp_year"] == data["exp_year"]
 
 
+@mock.patch("stripe.Customer.retrieve")
 @mock.patch("stripe.Card.delete")
-@mock.patch("stripe.Card.retrieve")
+@mock.patch("stripe.ListObject.retrieve")
 @pytest.mark.django_db
-def test_card_delete(card_retrieve, card_delete, user, api_client):
-    api_client.force_authenticate(user)
-    card_retrieve.return_value = get_mock_resource("Card")
+def test_card_delete(
+        card_retrieve,
+        card_delete,
+        customer_retrieve,
+        customer,
+        card,
+        api_client):
+
+    card.owner = customer.owner
+    card.source.pop("account", None)
+    card.source["customer"] = customer.stripe_id
+    card.save()
+
+    api_client.force_authenticate(card.owner)
+
+    customer_retrieve = customer.source
+    card_retrieve.return_value = card.source
     card_delete.return_value = None  # no one cares about this value... EVER
-    card = mommy.make(models.Card, owner=user, source=get_mock_resource("Card"))
 
     uri = reverse("rf_stripe:card-detail", kwargs={"pk": card.pk})
     response = api_client.delete(uri)

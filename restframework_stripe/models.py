@@ -92,6 +92,26 @@ class DefaultPaymentMixin(models.Model):
     class Meta:
         abstract = True
 
+    def retrieve_stripe_api_instance(self):
+        """ The process for updating payment / payout methods for stripe objects is
+        a bit different than other api objects. The steps involved are as follows.
+        1) Determine if this object is owned by an Account or a Customer
+        2) Retrieve the Account or Customer instace
+        3) Retrieve the payment method instance using the `sources` or `external_account`
+            parameter
+        4) Perform Updates
+        5) Call the `.save` method
+        """
+        owner = self.owner
+        if self.source.get("account"):
+            owner_param, source_param = "stripe_account", "external_accounts"
+        else:
+            owner_param, source_param = "stripe_customer", "sources"
+        stripe_owner = getattr(owner, owner_param)
+        stripe_owner = stripe_owner.retrieve_stripe_api_instance()
+        instance = stripe_owner[source_param].retrieve(self.stripe_id)
+        return instance
+
     def save(self, *args, **kwargs):
         if self.default_for_currency is True and self.currency:
             qs = type(self).objects.filter(owner=self.owner, currency=self.currency)

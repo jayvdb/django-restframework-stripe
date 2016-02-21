@@ -3,7 +3,7 @@ from django.conf.urls import include, url
 from rest_framework import routers
 from . import views
 
-router = routers.DefaultRouter()
+router = routers.SimpleRouter()
 router.register(r"cards", views.CardViewset, base_name="card")
 router.register(r"connected-accounts", views.ConnectedAccountViewset,
         base_name="connected-account")

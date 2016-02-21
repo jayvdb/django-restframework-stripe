@@ -85,6 +85,9 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
         instance.save()
         return instance
 
+    def retrieve_stripe_api_instance(self):
+        return self.instance.retrieve_stripe_api_instance()
+
     def run_validation(self, data=empty):
         """ extends the default serializer validation to include validation via the
         stripe api.
@@ -95,7 +98,7 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
 
         if self.instance is not None:
             try:
-                _instance = self.instance.retrieve_stripe_api_instance()
+                _instance = self.retrieve_stripe_api_instance()
             # an error due to an object not existing, invalid api key, or network outage
             except stripe.StripeError as err:  # pragma: no cover
                 self.reraise_stripe_error(err)
