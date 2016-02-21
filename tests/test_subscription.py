@@ -51,11 +51,19 @@ def test_create_subscription_with_coupon(create_sub, retrieve_customer, plan, co
     assert 0 < customer.owner.stripe_subscriptions.count()
 
 
+@mock.patch("stripe.Customer.retrieve")
 @mock.patch("stripe.Subscription.save")
-@mock.patch("stripe.Subscription.retrieve")
+@mock.patch("stripe.ListObject.retrieve")
 @pytest.mark.django_db
-def test_update_subscription(sub_retrieve, sub_update, customer, subscription,
-                                api_client, coupon):
+def test_update_subscription(
+        sub_retrieve,
+        sub_update,
+        customer_retrieve,
+        customer,
+        subscription,
+        api_client,
+        coupon):
+
     subscription.owner = customer.owner
     subscription.save()
     api_client.force_authenticate(customer.owner)
@@ -64,11 +72,11 @@ def test_update_subscription(sub_retrieve, sub_update, customer, subscription,
         "coupon": coupon.id
         }
 
-    sub_retrieve.return_value = get_mock_resource("Subscription",
-                                                    plan=subscription.plan.source)
+    customer_retrieve.return_value = customer.source
+    sub_retrieve.return_value = subscription.source
     sub_update.return_value = get_mock_resource("Subscription",
-        plan=subscription.plan.source,
-        discount={"coupon": coupon.source})
+                                plan=subscription.plan.source,
+                                discount={"coupon": coupon.source})
 
     uri = reverse("rf_stripe:subscription-detail", kwargs={"pk": subscription.pk})
     response = api_client.patch(uri, data=data, format="json")

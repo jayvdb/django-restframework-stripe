@@ -489,6 +489,12 @@ class Subscription(StripeModel):
             record["coupon"] = Coupon.objects.get(stripe_id=coupon)
         return record
 
+    def retrieve_stripe_api_instance(self):
+        customer = self.owner.stripe_customer
+        customer = customer.retrieve_stripe_api_instance()
+        instance = customer.subscriptions.retrieve(self.stripe_id)
+        return instance
+
 
 class Event(StripeModel):
     """
