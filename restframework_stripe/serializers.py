@@ -144,11 +144,12 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
                 value = value.stripe_id
             if value not in ("", None):
                 _data[key] = value
+        _data = _clean_dict(_data)
         return _data
         
 def _clean_dict(d):
     _dict = {}
-    for key, value in d:
+    for key, value in d.items():
         if isinstance(value, dict):
             _clean_dict(d)
         elif value not in (None, ""):
