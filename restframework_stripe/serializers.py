@@ -142,7 +142,7 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
         for key, value in data.items():
             if isinstance(value, models.StripeModel):
                 value = value.stripe_id
-            if value:
+            if value not in ("", None):
                 _data[key] = value
         return _data
 
