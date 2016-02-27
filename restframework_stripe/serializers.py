@@ -145,6 +145,15 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
             if value not in ("", None):
                 _data[key] = value
         return _data
+        
+def _clean_dict(d):
+    _dict = {}
+    for key, value in d:
+        if isinstance(value, dict):
+            _clean_dict(d)
+        elif value not in (None, ""):
+            _dict[key] = value
+    return _dict
 
 
 class StripeListObjectSerializer(StripeResourceSerializer):
