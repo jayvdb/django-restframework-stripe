@@ -251,16 +251,16 @@ class CreateCardResourceSerializer(StripeTokenResourceSerializer):
 class UpdateCardResourceSerializer(StripeResourceSerializer):
     """
     """
-    address_city = serializers.CharField(required=False)
-    address_country = serializers.CharField(required=False)
-    address_line1 = serializers.CharField(required=False)
-    address_line2 = serializers.CharField(required=False)
-    address_state = serializers.CharField(required=False)
-    address_zip = serializers.CharField(required=False)
-    exp_month = serializers.IntegerField(required=False)
-    exp_year = serializers.IntegerField(required=False)
-    name = serializers.CharField(required=False)
-    default_for_currency = serializers.BooleanField(required=False)
+    address_city = serializers.CharField(required=False, allow_null=True)
+    address_country = serializers.CharField(required=False, allow_null=True)
+    address_line1 = serializers.CharField(required=False, allow_null=True)
+    address_line2 = serializers.CharField(required=False, allow_null=True)
+    address_state = serializers.CharField(required=False, allow_null=True)
+    address_zip = serializers.CharField(required=False, allow_null=True)
+    exp_month = serializers.IntegerField(required=False, allow_null=True)
+    exp_year = serializers.IntegerField(required=False, allow_null=True)
+    name = serializers.CharField(required=False, allow_null=True)
+    default_for_currency = serializers.BooleanField(required=False, allow_null=True)
 
     class Meta:
         model = models.Card
@@ -444,7 +444,7 @@ class UpdateCustomerResourceSerializer(StripeResourceSerializer):
         ("card", "card")
         )
 
-    coupon = serializers.CharField(required=False)
+    coupon = serializers.CharField(required=False, allow_null=True)
     default_source = serializers.IntegerField(required=False, allow_null=True)
     default_source_type = serializers.ChoiceField(choices=TYPE_CHOICES, required=False,
                                                     allow_null=True)
