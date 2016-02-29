@@ -260,7 +260,7 @@ class UpdateCardResourceSerializer(StripeResourceSerializer):
     exp_month = serializers.IntegerField(required=False, allow_null=True)
     exp_year = serializers.IntegerField(required=False, allow_null=True)
     name = serializers.CharField(required=False, allow_null=True)
-    default_for_currency = serializers.BooleanField(required=False, allow_null=True)
+    default_for_currency = serializers.BooleanField(required=False)
 
     class Meta:
         model = models.Card
