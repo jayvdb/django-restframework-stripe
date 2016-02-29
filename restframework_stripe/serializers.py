@@ -151,7 +151,7 @@ def _clean_dict(d):
     _dict = {}
     for key, value in d.items():
         if isinstance(value, dict):
-            _clean_dict(d)
+            util.recursive_mapping_update(_dict, **{key: _clean_dict(value)})
         elif value not in (None, ""):
             _dict[key] = value
     return _dict
