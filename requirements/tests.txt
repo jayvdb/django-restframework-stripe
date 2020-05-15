@@ -1,6 +1,5 @@
 -r common.txt
 
-psycopg2-binary>=2.6.1
 model-mommy>=1.2.6
 coverage>=4.0.3
 py>=1.4.31

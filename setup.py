@@ -13,7 +13,6 @@ install_requirements = [
     ]
 
 test_requirements = [
-   "psycopg2>=2.6.1",
    "model-mommy>=1.2.6",
    "coverage>=4.0.3",
    "py>=1.4.31",
