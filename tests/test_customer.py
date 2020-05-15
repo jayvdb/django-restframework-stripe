@@ -31,7 +31,10 @@ def test_customer_update_bank_acct(customer_retrieve, customer_update, customer,
 
     customer.refresh_from_db()
     assert response.status_code == 200, response.data
-    assert customer.default_source.id == bank_account.id
+    if customer.default_source:
+        assert customer.default_source.id == bank_account.id
+    else:
+        assert customer.source['default_source']['id'] == bank_account.stripe_id
 
 
 @mock.patch("stripe.Customer.save")
@@ -54,21 +57,32 @@ def test_customer_update_card(customer_retrieve, customer_update, customer, card
 
     customer.refresh_from_db()
     assert response.status_code == 200, response.data
-    assert customer.default_source.id == card.id
+    if customer.default_source:
+        assert customer.default_source.id == card.id
+    else:
+        assert customer.source['default_source']['id'] == card.stripe_id
 
 
 @pytest.mark.django_db
 def test_customer_to_record_with_card_as_source(card):
     stripe_object = get_mock_resource("Customer", default_source=card.source)
     record = models.Customer.stripe_object_to_record(stripe_object)
-    assert record["default_source"].id == card.id
+    print(record)
+    if record.get("default_source", None):
+        assert record["default_source"].id == card.id
+    else:
+        assert record["source"]["default_source"].id == card.stripe_id
 
 
 @pytest.mark.django_db
 def test_customer_to_record_with_bank_account_as_source(bank_account):
     stripe_object = get_mock_resource("Customer", default_source=bank_account.source)
     record = models.Customer.stripe_object_to_record(stripe_object)
-    assert record["default_source"].id == bank_account.id
+    print(record)
+    if record.get("default_source", None):
+        assert record["default_source"].id == bank_account.id
+    else:
+        assert record["source"]["default_source"].id == bank_account.stripe_id
 
 
 @pytest.mark.django_db
@@ -76,6 +90,8 @@ def test_customer_to_record_with_string_as_source():
     stripe_object = get_mock_resource("Customer", default_source="bjkldjkfd532")
     record = models.Customer.stripe_object_to_record(stripe_object)
     assert record.get("default_source", None) is None
+    if record.get("source", None):
+        assert record["source"].get("defailt_source", None) is None
 
 
 @mock.patch("stripe.ListObject.create")

@@ -121,7 +121,10 @@ def test_update_connected_account(account_retrieve, account_update, managed_acco
 
     assert response.status_code == 200, response.data
     assert response.data["owner"] == managed_account.owner.id
-    assert response.data["source"]["business_name"] == data["business_name"]
+    if isinstance(response.data["source"], str):
+        assert "'business_name': '{}'".format(data["business_name"]) in response.data["source"]
+    else:
+        assert response.data["source"]["business_name"] == data["business_name"]
 
 
 @mock.patch("stripe.Account.save")
