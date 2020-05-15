@@ -34,7 +34,7 @@ docs_requirements = [
 
 
 setup(
-    name="Django Restframework Stripe",
+    name="django-restframework-stripe",
     version="1.0",
     packages=find_packages(exclude=["tests"]),
     install_requires=install_requirements,
