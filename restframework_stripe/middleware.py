@@ -1,6 +1,7 @@
 from collections import namedtuple
 
 from django.utils.functional import SimpleLazyObject
+from django.utils.deprecation import MiddlewareMixin
 
 
 Info = namedtuple("Info", ["is_merchant", "is_customer"])
@@ -13,7 +14,7 @@ def get_customer_merchant(request):
     return request._cached_rf_stripe_info
 
 
-class CustomerMerchantMiddleware:
+class CustomerMerchantMiddleware(MiddlewareMixin):
     """ explicitly adds the request.users booleans indicating that the requesting user is
     a customer or merchant in your platform. This allows a simplification of API
     permissions and views.
