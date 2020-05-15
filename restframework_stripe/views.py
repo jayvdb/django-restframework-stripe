@@ -2,7 +2,12 @@ from rest_framework import status
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.decorators import detail_route
+try:
+    from rest_framework.decorators import detail_route
+except ImportError:
+    import functools
+    from rest_framework.decorators import action
+    detail_route = functools.partial(action, detail=True)
 
 from . import models, serializers, permissions
 
