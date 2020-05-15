@@ -2,7 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.postgres.fields import JSONField
+from jsonfield import JSONField
 from django.core.exceptions import ValidationError as DJValidationError
 
 import stripe
