@@ -146,9 +146,9 @@ class Customer(StripeModel):
     """
     STRIPE_API_NAME = "Customer"
 
-    owner = models.OneToOneField(settings.AUTH_USER_MODEL, related_name="stripe_customer")
+    owner = models.OneToOneField(settings.AUTH_USER_MODEL, related_name="stripe_customer", on_delete=models.CASCADE)
 
-    source_type = models.ForeignKey(ContentType, null=True)
+    source_type = models.ForeignKey(ContentType, null=True, on_delete=models.CASCADE)
     source_id = models.PositiveIntegerField(null=True)
     default_source = GenericForeignKey("source_type", "source_id")
 
@@ -215,7 +215,7 @@ class Card(DefaultPaymentMixin, StripeModel):
     """
     STRIPE_API_NAME = "Card"
 
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="stripe_cards")
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="stripe_cards", on_delete=models.CASCADE)
     cvc_check = models.CharField(max_length=20, null=True, blank=True)
 
     @classmethod
@@ -275,7 +275,7 @@ class Charge(StripeModel):
     """
     STRIPE_API_NAME = "Charge"
 
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="stripe_charges")
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="stripe_charges", on_delete=models.CASCADE)
     status = models.CharField(max_length=25)
 
     @classmethod
@@ -344,7 +344,7 @@ class ConnectedAccount(StripeModel):
     """
     STRIPE_API_NAME = "Account"
 
-    owner = models.OneToOneField(settings.AUTH_USER_MODEL, related_name="stripe_account")
+    owner = models.OneToOneField(settings.AUTH_USER_MODEL, related_name="stripe_account", on_delete=models.CASCADE)
     managed = models.BooleanField()
 
     secret_key = models.CharField(max_length=120, null=True, blank=True)
@@ -403,7 +403,7 @@ class BankAccount(DefaultPaymentMixin, StripeModel):
     STRIPE_API_NAME = "BankAccount"
 
     owner = models.ForeignKey(settings.AUTH_USER_MODEL,
-                                related_name="stripe_bank_accounts")
+                                related_name="stripe_bank_accounts", on_delete=models.CASCADE)
     status = models.CharField(max_length=20)
 
     @classmethod
@@ -449,7 +449,7 @@ class Transfer(StripeModel):
     """
     STRIPE_API_NAME = "Transfer"
 
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="stripe_transfers")
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="stripe_transfers", on_delete=models.CASCADE)
     status = models.CharField(max_length=20)
 
     @classmethod
@@ -474,10 +474,10 @@ class Subscription(StripeModel):
     STRIPE_API_NAME = "Subscription"
 
     owner = models.ForeignKey(settings.AUTH_USER_MODEL,
-                                related_name="stripe_subscriptions")
+                                related_name="stripe_subscriptions", on_delete=models.CASCADE)
 
-    plan = models.ForeignKey("Plan", related_name="subscriptions")
-    coupon = models.ForeignKey("Coupon", null=True, related_name="subscriptions")
+    plan = models.ForeignKey("Plan", related_name="subscriptions", on_delete=models.CASCADE)
+    coupon = models.ForeignKey("Coupon", null=True, related_name="subscriptions", on_delete=models.CASCADE)
     canceled = models.BooleanField(default=False)
 
     @classmethod
@@ -566,7 +566,7 @@ class EventProcessingError(models.Model):
         )
 
     error_type = models.SmallIntegerField(choices=ERROR_TYPES, default=PROCESSING)
-    event = models.ForeignKey(Event, related_name="processing_errors")
+    event = models.ForeignKey(Event, related_name="processing_errors", on_delete=models.CASCADE)
     message = models.TextField()
     datetime_created = models.DateTimeField(auto_now_add=True)
 
@@ -703,9 +703,9 @@ class Refund(StripeModel):
         (REQUESTED, "requested_by_customer")
         )
 
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="stripe_refunds")
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="stripe_refunds", on_delete=models.CASCADE)
 
-    charge = models.ForeignKey("Charge", related_name="refunds")
+    charge = models.ForeignKey("Charge", related_name="refunds", on_delete=models.CASCADE)
     amount = models.PositiveIntegerField()
     reason = models.PositiveSmallIntegerField(choices=REFUND_REASON_CHOICES)
     refund_application_fee = models.NullBooleanField()
