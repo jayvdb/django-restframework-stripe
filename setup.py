@@ -4,6 +4,7 @@ install_requirements = [
     "Django>=1.8",
     "djangorestframework==3.3.2",
     "Jinja2==2.8",
+    "jsonfield",
     "MarkupSafe==0.23",
     "pytz==2015.7",
     "requests==2.9.1",
