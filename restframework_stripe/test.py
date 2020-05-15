@@ -1,5 +1,7 @@
 import stripe
 
+from .models import convert_to_stripe_object
+
 from . import util
 
 
@@ -521,4 +523,4 @@ MOCKS = {
 def get_mock_resource(resource_string, **overrides):
     mock = MOCKS[resource_string].copy()
     mock = util.recursive_mapping_update(mock, **overrides)
-    return stripe.convert_to_stripe_object(mock, stripe.api_key, None)
+    return convert_to_stripe_object(mock, stripe.api_key, None)

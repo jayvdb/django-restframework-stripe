@@ -8,6 +8,8 @@ import stripe
 
 from rest_framework.reverse import reverse
 
+from stripe.error import InvalidRequestError
+
 from restframework_stripe.test import get_mock_resource
 from restframework_stripe import models
 
@@ -28,7 +30,7 @@ def test_creating_refund(create_refund, charge):
 @mock.patch("stripe.Refund.create")
 @pytest.mark.django_db
 def test_creating_refund_error(create_refund, charge):
-    create_refund.side_effect = stripe.InvalidRequestError(param="charge", message="no")
+    create_refund.side_effect = InvalidRequestError(param="charge", message="no")
     refund = models.Refund(
         charge=charge,
         amount=charge.source["amount"],

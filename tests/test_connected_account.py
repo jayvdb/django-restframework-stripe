@@ -4,6 +4,8 @@ from django.utils import timezone
 
 import pytest
 import stripe
+from stripe.error import InvalidRequestError
+
 from model_mommy import mommy
 
 from rest_framework.reverse import reverse
@@ -75,7 +77,7 @@ def test_register_managed_account_error(account_create, user, api_client):
         }
     mock_keys = {"private": "sec_43ioJIO32", "publishable": "pub_jkJIJ390jF90"}
     api_client.force_authenticate(user)
-    account_create.side_effect = stripe.InvalidRequestError(param="dob",
+    account_create.side_effect = InvalidRequestError(param="dob",
             message="invalid date of birth")
     uri = reverse("rf_stripe:connected-account-list")
 
@@ -133,7 +135,7 @@ def test_update_connected_account_error(account_retrieve, account_update, manage
         "business_name": "targus"
         })
     account_retrieve.return_value = get_mock_resource("Account", managed=True)
-    account_update.side_effect = stripe.InvalidRequestError(param="business_name",
+    account_update.side_effect = InvalidRequestError(param="business_name",
         message="no targuses allowed!")
 
     uri = reverse("rf_stripe:connected-account-detail", kwargs={"pk": managed_account.pk})

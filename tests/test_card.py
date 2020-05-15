@@ -2,6 +2,8 @@ from unittest import mock
 
 import pytest
 import stripe
+from stripe.error import InvalidRequestError
+
 from model_mommy import mommy
 
 from rest_framework.reverse import reverse
@@ -77,7 +79,7 @@ def test_card_create_error(card_create, customer_retrieve, customer, api_client)
         "type": "customer"
         }
     customer_retrieve.return_value = get_mock_resource("Customer")
-    card_create.side_effect = stripe.InvalidRequestError("invalid token!", "token")
+    card_create.side_effect = InvalidRequestError("invalid token!", "token")
 
     response = api_client.post(uri, data=data, format="json")
     assert response.status_code == 400

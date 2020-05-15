@@ -19,6 +19,7 @@ from rest_framework.fields import empty
 from rest_framework.exceptions import ValidationError
 
 import stripe
+from stripe.error import StripeError
 
 from . import models
 from . import util
@@ -100,7 +101,7 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
             try:
                 _instance = self.retrieve_stripe_api_instance()
             # an error due to an object not existing, invalid api key, or network outage
-            except stripe.StripeError as err:  # pragma: no cover
+            except StripeError as err:  # pragma: no cover
                 self.reraise_stripe_error(err)
 
         # validate clients data with stripe
@@ -117,7 +118,7 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
         data = self._process_data_for_stripe(data)
         try:
             instance = self.get_model_class().stripe_api_create(**data)
-        except stripe.StripeError as err:
+        except StripeError as err:
             self.reraise_stripe_error(err)
         else:
             return instance
@@ -130,7 +131,7 @@ class StripeResourceSerializer(ReturnSerializerMixin, serializers.Serializer):
         instance = util.recursive_mapping_update(instance, **data)
         try:
             instance = instance.save()
-        except stripe.StripeError as err:
+        except StripeError as err:
             self.reraise_stripe_error(err)
         else:
             return instance
@@ -178,7 +179,7 @@ class StripeListObjectSerializer(StripeResourceSerializer):
         try:
             stripe_object = list_object.create(**data)
         # an error due to an object not existing, invalid api key, or network outage
-        except stripe.StripeError as err:  # pragma: no cover
+        except StripeError as err:  # pragma: no cover
             self.reraise_stripe_error(err)
         else:
             return stripe_object
@@ -242,7 +243,7 @@ class CreateCardResourceSerializer(StripeTokenResourceSerializer):
             elif type_ == "customer":  # pragma: no branch
                 instance = owner.stripe_customer.add_payment_source(token)
 
-        except stripe.StripeError as err:  # raise a validation error, return to client
+        except StripeError as err:  # raise a validation error, return to client
             self.reraise_stripe_error(err)
         else:
             return instance
