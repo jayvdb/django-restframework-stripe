@@ -5,6 +5,7 @@ from django.db.models import manager
 from django.utils import timezone
 
 import stripe
+from stripe.error import InvalidRequestError
 
 from .util import recursive_mapping_update
 
@@ -44,7 +45,7 @@ class ConnectedAccountManager(manager.Manager):
         response = requests.post(uri, params=data).json()
         if response.get("error"):
             # 100% likely to be an error on our end from the `auth_code` parameter
-            raise stripe.InvalidRequestError(
+            raise InvalidRequestError(
                 message=response["error_description"],
                 param=response["error"],
                 json_body=response
@@ -86,7 +87,7 @@ class PlanManager(manager.Manager):
             model.stripe_id = stripe_object["id"]
             model.source = stripe_object
             model.is_created = True
-        except stripe.InvalidRequestError as err:
+        except InvalidRequestError as err:
             raise DJValidationError(message={err.param: err._message})
 
         return model
@@ -115,7 +116,7 @@ class CouponManager(manager.Manager):
             model.stripe_id = stripe_object["id"]
             model.source = stripe_object
             model.is_created = True
-        except stripe.InvalidRequestError as err:
+        except InvalidRequestError as err:
             raise DJValidationError(message={err.param: err._message})
 
         return model
@@ -137,7 +138,7 @@ class RefundManager(manager.Manager):
             model.source = stripe_object
             model.owner = model.charge.owner
             model.is_created = True
-        except stripe.InvalidRequestError as err:
+        except InvalidRequestError as err:
             raise DJValidationError(message={err.param: err._message})
 
         return model

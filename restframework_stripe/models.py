@@ -6,9 +6,22 @@ from jsonfield import JSONField
 from django.core.exceptions import ValidationError as DJValidationError
 
 import stripe
+try:
+    from stripe import convert_to_stripe_object
+except ImportError:
+    from stripe.util import convert_to_stripe_object
+
+from stripe.stripe_object import StripeObject
 
 from . import managers
 from .webhooks import webhooks
+
+
+def _get_class_name(obj):
+    try:
+        return obj.class_name()
+    except Exception:
+        return obj.__class__.__name__.lower()
 
 
 class StripeModel(models.Model):
@@ -156,7 +169,7 @@ class Customer(StripeModel):
         stripe_object = self.retrieve_stripe_api_instance()
         new_source = stripe_object.sources.create(source=token)
 
-        class_name = new_source.class_name()
+        class_name = _get_class_name(new_source)
         if class_name == "bankaccount":
             source = BankAccount.stripe_object_to_model(new_source)
         elif class_name == "card":
@@ -172,8 +185,8 @@ class Customer(StripeModel):
     def stripe_object_to_record(cls, stripe_object):
         record = super().stripe_object_to_record(stripe_object)
         default_source = stripe_object.get("default_source", None)
-        if default_source is not None and isinstance(default_source, stripe.StripeObject):
-            class_name = default_source.class_name()
+        if default_source is not None and isinstance(default_source, StripeObject):
+            class_name = _get_class_name(default_source)
             if class_name == "bankaccount":
                 default_source = BankAccount.objects.get(stripe_id=default_source["id"])
                 record["default_source"] = default_source
@@ -287,8 +300,8 @@ class Charge(StripeModel):
     def retrieve_payment_source(self):
         """
         """
-        source = stripe.convert_to_stripe_object(self.source["source"], None, None)
-        class_name = source.class_name()
+        source = convert_to_stripe_object(self.source["source"], None, None)
+        class_name = _get_class_name(source)
         if class_name == "card":
             s = Card.objects.get(stripe_id=source["id"])
         elif class_name == "bankaccount":
@@ -372,7 +385,7 @@ class ConnectedAccount(StripeModel):
         stripe_object = self.retrieve_stripe_api_instance()
         new_source = stripe_object.external_accounts.create(external_account=token)
 
-        class_name = new_source.class_name()
+        class_name = _get_class_name(new_source)
         if class_name == "bankaccount":
             source = BankAccount.stripe_object_to_model(new_source)
         elif class_name == "card":
@@ -529,7 +542,7 @@ class Event(StripeModel):
             webhooks.call_handlers(self, self.source["data"], event_type, event_subtype)
             self.processed = True
             self.save()
-        except stripe.StripeError as err:
+        except stripe.error.StripeError as err:
             EventProcessingError.objects.create(
                 event=self,
                 message=err._message,
@@ -545,7 +558,7 @@ class Event(StripeModel):
             self.stripe_object_sync(stripe_object)
             self.verified = True
             self.save()
-        except stripe.StripeError as err:
+        except stripe.error.StripeError as err:
             EventProcessingError.objects.create(
                 error_type=EventProcessingError.VALIDATING,
                 event=self,

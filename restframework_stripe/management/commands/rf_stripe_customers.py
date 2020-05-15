@@ -3,6 +3,8 @@ import asyncio
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 
+from stripe.error import StripeError
+
 from restframework_stripe import STRIPE
 
 
@@ -53,7 +55,7 @@ def create_stripe_instance(**kwargs):
         stripe_object = Customer.stripe_api_create(
             description=desc,
             )
-    except stripe.StripeError as err:
+    except StripeError as err:
         print("Error creating", desc, err._message)
 
     return stripe_object
