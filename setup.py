@@ -13,7 +13,7 @@ install_requirements = [
     ]
 
 test_requirements = [
-   "model-mommy>=1.2.6",
+   "model-bakery>=1.1.0",
    "coverage>=4.0.3",
    "py>=1.4.31",
    "pytest>=2.8.5",

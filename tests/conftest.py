@@ -4,7 +4,7 @@ from django.conf import settings
 import pytest
 from rest_framework.test import APIClient
 
-from model_mommy import mommy
+from model_bakery import baker as mommy
 
 from restframework_stripe import models
 from restframework_stripe.test import get_mock_resource

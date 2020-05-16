@@ -3,7 +3,7 @@ from unittest import mock
 from django.core.exceptions import ValidationError
 
 import pytest
-from model_mommy import mommy
+from model_bakery import baker as mommy
 import stripe
 
 from rest_framework.reverse import reverse

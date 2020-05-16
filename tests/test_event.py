@@ -4,7 +4,7 @@ import pytest
 import stripe
 from stripe.error import StripeError
 
-from model_mommy import mommy
+from model_bakery import baker as mommy
 
 from rest_framework.reverse import reverse
 

@@ -1,7 +1,7 @@
 from unittest import mock
 
 import pytest
-from model_mommy import mommy
+from model_bakery import baker as mommy
 
 from rest_framework.reverse import reverse
 
