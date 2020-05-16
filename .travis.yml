@@ -9,7 +9,7 @@ python:
     - "nightly"
 
 env:
-  - POST_COMMAND=coveralls
+  - POST_COMMAND=codecov
 
 install:
     - pip install tox-travis
